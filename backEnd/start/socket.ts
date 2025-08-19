@@ -8,6 +8,7 @@ import {
   boatTick,
   clickBoat as clickBoatAction,
   markDisconnected,
+  markGameWaitingIfNotAllReady,
 } from '../app/controllers/game.controller.js'
 
 // Puerto para WebSocket
@@ -36,7 +37,7 @@ async function startBoatLoop(gameId: number) {
       gameLoops.delete(gameId)
       return
     }
-    io.to(`game:${gameId}`).emit('updateBoat', tick.boat)
+    io.to(`game:${gameId}`).emit('updateBoat', { boat: tick.boat })
   }, 500)
 
   gameLoops.set(gameId, interval)
@@ -115,7 +116,13 @@ io.on('connection', (socket) => {
     console.log(`❌ Socket desconectado: ${socket.id}`)
     // Opcional: marcar jugador como no listo si se desconecta
     const res = await markDisconnected(socket.id)
-    if (res.player) io.to(`game:${res.player.gameId}`).emit('playerReady', { userId: res.player.userId, boatChoice: res.player.boatChoice })
+    if (res.player) {
+      io.to(`game:${res.player.gameId}`).emit('playerNotReady', { userId: res.player.userId })
+      const waitingRes = await markGameWaitingIfNotAllReady(res.player.gameId)
+      if (waitingRes.changed) {
+        io.to(`game:${res.player.gameId}`).emit('gameWaiting', { gameId: res.player.gameId })
+      }
+    }
   })
 })
 

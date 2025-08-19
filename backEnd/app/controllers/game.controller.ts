@@ -118,3 +118,18 @@ export async function markDisconnected(socketId: string): Promise<{ player: Game
 }
 
 
+export async function markGameWaitingIfNotAllReady(gameId: number) {
+  const players = await GamePlayer.query().where('game_id', gameId)
+  const allReady = players.length >= 2 && players.every((p) => p.ready)
+  if (allReady) return { changed: false }
+
+  const game = await Game.find(gameId)
+  if (!game) return { changed: false }
+  if (game.status !== 'ready') return { changed: false }
+
+  game.status = 'waiting'
+  await game.save()
+  return { changed: true }
+}
+
+

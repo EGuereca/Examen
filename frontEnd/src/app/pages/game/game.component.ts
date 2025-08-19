@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { GameSocketService } from '../../services/game-socket.service';
 import { Boat, Game, GamePlayer, GameStatus } from '../../models/game.model';
+import { Observable } from 'rxjs';
 import { GameService } from '../../services/game.service';
 
 @Component({
@@ -26,6 +27,12 @@ export class GameComponent implements OnInit, OnDestroy {
   players: GamePlayer[] = [];
 
   selectedBoat: string | null = null;
+
+  // Reactive streams for template (async pipe)
+  game$!: Observable<Game | null>;
+  boat$!: Observable<Boat | null>;
+  players$!: Observable<GamePlayer[]>;
+  status$!: Observable<GameStatus>;
 
   ngOnInit(): void {
     const idParam = this.#route.snapshot.paramMap.get('id');
@@ -109,6 +116,13 @@ export class GameComponent implements OnInit, OnDestroy {
       userId: player.userId,
     });
 
+    // Bind reactive streams for template
+    this.game$ = this.#socket.currentGame$;
+    this.boat$ = this.#socket.currentBoat$;
+    this.players$ = this.#socket.gamePlayers$;
+    this.status$ = this.#socket.gameStatus$;
+
+    // Keep local mirrors for imperative checks
     this.#socket.currentGame$.subscribe((g) => {
       if (g) {
         this.game = g;

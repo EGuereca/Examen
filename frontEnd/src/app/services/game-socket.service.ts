@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, NgZone } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { Game, GamePlayer, GameStatus, Boat } from '../models/game.model';
@@ -61,6 +61,7 @@ export interface ErrorEvent {
 export class GameSocketService {
   private socket: Socket | null = null;
   private readonly SOCKET_URL = 'http://localhost:3334';
+  private pendingJoinPayload: JoinGamePayload | null = null;
 
   // Game state observables
   private currentGameSubject = new BehaviorSubject<Game | null>(null);
@@ -74,7 +75,7 @@ export class GameSocketService {
   public gamePlayers$ = this.gamePlayersSubject.asObservable();
   public gameStatus$ = this.gameStatusSubject.asObservable();
 
-  constructor() {}
+  constructor(private zone: NgZone) {}
 
   /**
    * Connect to the socket server
@@ -103,8 +104,9 @@ export class GameSocketService {
    * Join a game room
    */
   joinGame(payload: JoinGamePayload): void {
-    if (!this.socket?.connected) {
-      console.error('Socket not connected');
+    if (!this.socket || !this.socket.connected) {
+      this.pendingJoinPayload = payload;
+      this.connect();
       return;
     }
 
@@ -155,47 +157,83 @@ export class GameSocketService {
 
     // Connection events
     this.socket.on('connect', () => {
-      console.log('🔌 Connected to game server');
+      this.zone.run(() => {
+        console.log('🔌 Connected to game server');
+        if (this.pendingJoinPayload) {
+          this.socket!.emit('join', this.pendingJoinPayload);
+          this.pendingJoinPayload = null;
+        }
+      });
     });
 
     this.socket.on('disconnect', () => {
-      console.log('❌ Disconnected from game server');
-      this.resetGameState();
+      this.zone.run(() => {
+        console.log('❌ Disconnected from game server');
+        this.resetGameState();
+      });
     });
 
     // Game events
     this.socket.on('playerJoined', (data: PlayerJoinedEvent) => {
-      console.log('👤 Player joined:', data.userId);
-      this.handlePlayerJoined(data);
+      this.zone.run(() => {
+        console.log('👤 Player joined:', data.userId);
+        this.handlePlayerJoined(data);
+      });
     });
 
     this.socket.on('playerReady', (data: PlayerReadyEvent) => {
-      console.log('✅ Player ready:', data.userId, 'Boat:', data.boatChoice);
-      this.handlePlayerReady(data);
+      this.zone.run(() => {
+        console.log('✅ Player ready:', data.userId, 'Boat:', data.boatChoice);
+        this.handlePlayerReady(data);
+      });
+    });
+
+    this.socket.on('playerNotReady', (data: { userId: number }) => {
+      this.zone.run(() => {
+        console.log('⏳ Player not ready:', data.userId);
+        this.handlePlayerNotReady(data.userId);
+      });
     });
 
     this.socket.on('gameReady', (data: GameReadyEvent) => {
-      console.log('🎮 Game ready:', data.gameId);
-      this.handleGameReady(data);
+      this.zone.run(() => {
+        console.log('🎮 Game ready:', data.gameId);
+        this.handleGameReady(data);
+      });
+    });
+
+    this.socket.on('gameWaiting', (data: { gameId: number }) => {
+      this.zone.run(() => {
+        console.log('🕓 Game back to waiting:', data.gameId);
+        this.handleGameWaiting(data.gameId);
+      });
     });
 
     this.socket.on('start', (data: StartEvent) => {
-      console.log('🚀 Game started with boat:', data.boat);
-      this.handleGameStart(data);
+      this.zone.run(() => {
+        console.log('🚀 Game started with boat:', data.boat);
+        this.handleGameStart(data);
+      });
     });
 
     this.socket.on('updateBoat', (data: UpdateBoatEvent) => {
-      this.handleBoatUpdate(data);
+      this.zone.run(() => {
+        this.handleBoatUpdate(data);
+      });
     });
 
     this.socket.on('winner', (data: WinnerEvent) => {
-      console.log('🏆 Winner:', data.winner);
-      this.handleGameWinner(data);
+      this.zone.run(() => {
+        console.log('🏆 Winner:', data.winner);
+        this.handleGameWinner(data);
+      });
     });
 
     this.socket.on('error', (data: ErrorEvent) => {
-      console.error('❌ Socket error:', data.msg);
-      this.handleSocketError(data);
+      this.zone.run(() => {
+        console.error('❌ Socket error:', data.msg);
+        this.handleSocketError(data);
+      });
     });
   }
 
@@ -203,8 +241,25 @@ export class GameSocketService {
    * Handle player joined event
    */
   private handlePlayerJoined(data: PlayerJoinedEvent): void {
-    // Update game players list if needed
-    // This could trigger a refresh of the game state
+    const currentGame = this.currentGameSubject.value;
+    if (!currentGame) return;
+    const currentPlayers = currentGame.players ? [...currentGame.players] : [];
+    const exists = currentPlayers.some((p) => p.userId === data.userId);
+    if (!exists) {
+      const newPlayer: GamePlayer = {
+        id: 0,
+        gameId: currentGame.id,
+        userId: data.userId,
+        socketId: null,
+        boatChoice: null,
+        ready: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as GamePlayer;
+      currentPlayers.push(newPlayer);
+    }
+    this.currentGameSubject.next({ ...currentGame, players: currentPlayers });
+    this.gamePlayersSubject.next(currentPlayers);
   }
 
   /**
@@ -225,6 +280,28 @@ export class GameSocketService {
         ...currentGame,
         players: updatedPlayers
       });
+      this.gamePlayersSubject.next(updatedPlayers);
+    }
+  }
+
+  /**
+   * Handle player not ready (on disconnect)
+   */
+  private handlePlayerNotReady(userId: number): void {
+    const currentGame = this.currentGameSubject.value
+    if (currentGame?.players) {
+      const updatedPlayers = currentGame.players.map(player => {
+        if (player.userId === userId) {
+          return { ...player, ready: false }
+        }
+        return player
+      })
+
+      this.currentGameSubject.next({
+        ...currentGame,
+        players: updatedPlayers
+      })
+      this.gamePlayersSubject.next(updatedPlayers)
     }
   }
 
@@ -236,10 +313,21 @@ export class GameSocketService {
     
     const currentGame = this.currentGameSubject.value;
     if (currentGame) {
-      this.currentGameSubject.next({
-        ...currentGame,
-        status: 'ready'
-      });
+      const nextGame = { ...currentGame, status: 'ready' as GameStatus };
+      this.currentGameSubject.next(nextGame);
+    }
+  }
+
+  /**
+   * Handle game back to waiting
+   */
+  private handleGameWaiting(gameId: number): void {
+    this.gameStatusSubject.next('waiting')
+
+    const currentGame = this.currentGameSubject.value
+    if (currentGame && currentGame.id === gameId) {
+      const nextGame = { ...currentGame, status: 'waiting' as GameStatus }
+      this.currentGameSubject.next(nextGame)
     }
   }
 
@@ -252,10 +340,8 @@ export class GameSocketService {
     
     const currentGame = this.currentGameSubject.value;
     if (currentGame) {
-      this.currentGameSubject.next({
-        ...currentGame,
-        status: 'in_progress'
-      });
+      const nextGame = { ...currentGame, status: 'in_progress' as GameStatus };
+      this.currentGameSubject.next(nextGame);
     }
   }
 
@@ -274,11 +360,8 @@ export class GameSocketService {
     
     const currentGame = this.currentGameSubject.value;
     if (currentGame) {
-      this.currentGameSubject.next({
-        ...currentGame,
-        status: 'finished',
-        winnerId: data.winner
-      });
+      const nextGame = { ...currentGame, status: 'finished' as GameStatus, winnerId: data.winner };
+      this.currentGameSubject.next(nextGame);
     }
   }
 
