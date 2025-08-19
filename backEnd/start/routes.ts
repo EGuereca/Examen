@@ -9,6 +9,7 @@
 
 import router from '@adonisjs/core/services/router'
 import AuthController from '../app/controllers/auth.controller.js'
+import GameHttpController from '../app/controllers/game.http.controller.js'
 
 import { middleware } from './kernel.js'
 
@@ -24,3 +25,9 @@ router.get('/', async () => {
     hello: 'world',
   }
 })
+
+router.group(() => {
+  router.post('/games', [GameHttpController, 'create']).use(middleware.auth())
+  router.get('/games', [GameHttpController, 'index'])
+  router.post('/games/:id/join', [GameHttpController, 'join']).use(middleware.auth())
+}).prefix('/api')
