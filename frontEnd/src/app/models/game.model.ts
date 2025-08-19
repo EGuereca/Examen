@@ -23,6 +23,18 @@ export interface GamePlayer {
   game?: Game;
 }
 
+export interface Boat {
+  id: number;
+  gameId: number | null;
+  position: number;
+  ownerId: number;
+  direction: 'forward' | 'backward';
+  createdAt: string;
+  updatedAt: string;
+  game?: Game;
+  owner?: User;
+}
+
 export interface Game {
   id: number;
   creatorId: number;
@@ -33,7 +45,7 @@ export interface Game {
   creator?: User;
   winner?: User;
   players?: GamePlayer[];
-  boats?: any[]; // Boat interface can be added later if needed
+  boats?: Boat[];
 }
 
 // Request Interfaces
