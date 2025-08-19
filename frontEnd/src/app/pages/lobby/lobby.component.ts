@@ -62,7 +62,9 @@ export class LobbyComponent implements OnInit {
     this.gameService.joinGame(gameId).subscribe({
       next: (response) => {
         console.log('Joined game successfully:', response);
-        this.loadGames(); // Reload games list to update player count
+        const game = response.data.game;
+        const player = response.data.player;
+        this.router.navigate([`/game/${game.id}`], { state: { data: { game, player } } });
       },
       error: (error) => {
         console.error('Error joining game:', error);

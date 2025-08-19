@@ -25,7 +25,7 @@ export class AuthService {
 
   fetchMe(): Observable<MeResponse> {
     return this.#http.get<MeResponse>(
-      `${environment.apiBaseUrl}auth/me`
+      `${environment.apiBaseUrl}/auth/me`
     ).pipe(
       tap(res => this._user$.next(res.data))
     );

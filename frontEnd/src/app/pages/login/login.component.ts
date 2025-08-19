@@ -44,7 +44,18 @@ export class Login {
     this.auth.login(loginData).subscribe({
       next: (res: LoginResponse) => {
         this.loading = false;
-        localStorage.setItem('access_token', res.data.token);
+        const rawToken: any = (res as any)?.data?.token;
+        const token: string | undefined =
+          typeof rawToken === 'string'
+            ? rawToken
+            : rawToken?.token || rawToken?.value;
+
+        if (!token) {
+          this.error = 'No se pudo obtener el token de acceso';
+          return;
+        }
+
+        localStorage.setItem('access_token', token);
 
         this.router.navigate(['/lobby']);
       },
