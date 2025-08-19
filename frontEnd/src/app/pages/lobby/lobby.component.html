@@ -3,9 +3,17 @@
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
           <div class="flex items-center">
-            <h1 class="text-xl font-semibold text-gray-900">Lobby</h1>
+            <h1 class="text-xl font-semibold text-gray-900">Lobby - Juegos Disponibles</h1>
           </div>
-          <div class="flex items-center">
+          <div class="flex items-center space-x-4">
+            <button
+              (click)="createGame()"
+              [disabled]="isCreatingGame"
+              class="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center"
+            >
+              <span *ngIf="isCreatingGame" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+              {{ isCreatingGame ? 'Creando...' : 'Crear Juego' }}
+            </button>
             <button
               (click)="logout()"
               class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium"
@@ -19,11 +27,124 @@
     
     <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
       <div class="px-4 py-6 sm:px-0">
-        <div class="border-4 border-dashed border-gray-200 rounded-lg h-96 flex items-center justify-center">
-          <div class="text-center">
-            <h2 class="text-2xl font-bold text-gray-900 mb-4">¡Bienvenido!</h2>
-            <p class="text-gray-600">Has iniciado sesión correctamente.</p>
+        
+        <!-- Loading State -->
+        <div *ngIf="isLoading" class="text-center py-12">
+          <div class="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <p class="mt-4 text-gray-600">Cargando juegos...</p>
+        </div>
+
+        <!-- Games List -->
+        <div *ngIf="!isLoading" class="space-y-6">
+          
+          <!-- Header -->
+          <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex justify-between items-center">
+              <div>
+                <h2 class="text-2xl font-bold text-gray-900">Juegos Disponibles</h2>
+                <p class="text-gray-600 mt-1">{{ games.length }} juego(s) encontrado(s)</p>
+              </div>
+              <button
+                (click)="loadGames()"
+                class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md text-sm font-medium"
+              >
+                🔄 Actualizar
+              </button>
+            </div>
           </div>
+
+          <!-- Games Grid -->
+          <div *ngIf="games.length > 0; else noGames" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div *ngFor="let game of games" class="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+              <div class="p-6">
+                
+                <!-- Game Header -->
+                <div class="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Juego #{{ game.id }}</h3>
+                    <p class="text-sm text-gray-500">Creado: {{ game.createdAt | date:'short' }}</p>
+                  </div>
+                  <span 
+                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                    [class]="getStatusColor(game.status)"
+                  >
+                    {{ getStatusDisplay(game.status) }}
+                  </span>
+                </div>
+
+                <!-- Game Info -->
+                <div class="space-y-3">
+                  <div class="flex justify-between text-sm">
+                    <span class="text-gray-500">Creador:</span>
+                    <span class="font-medium">{{ game.creator?.fullName || game.creator?.email || 'Usuario #' + game.creatorId }}</span>
+                  </div>
+                  
+                  <div class="flex justify-between text-sm">
+                    <span class="text-gray-500">Jugadores:</span>
+                    <span class="font-medium">{{ game.players?.length || 0 }}/2</span>
+                  </div>
+
+                  <div *ngIf="game.winner" class="flex justify-between text-sm">
+                    <span class="text-gray-500">Ganador:</span>
+                    <span class="font-medium text-green-600">{{ game.winner.fullName || game.winner.email || 'Usuario #' + game.winnerId }}</span>
+                  </div>
+                </div>
+
+                <!-- Players List -->
+                <div *ngIf="game.players && game.players.length > 0" class="mt-4">
+                  <h4 class="text-sm font-medium text-gray-700 mb-2">Jugadores:</h4>
+                  <div class="space-y-1">
+                    <div *ngFor="let player of game.players" class="flex items-center justify-between text-sm">
+                      <span>{{ player.user?.fullName || player.user?.email || 'Usuario #' + player.userId }}</span>
+                      <span 
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs"
+                        [class]="player.ready ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'"
+                      >
+                        {{ player.ready ? 'Listo' : 'Esperando' }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="mt-6 pt-4 border-t border-gray-200">
+                  <button
+                    *ngIf="canJoinGame(game)"
+                    (click)="joinGame(game.id)"
+                    class="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-md text-sm font-medium transition-colors"
+                  >
+                    Unirse al Juego
+                  </button>
+                  
+                  <div *ngIf="!canJoinGame(game)" class="text-center">
+                    <span class="text-sm text-gray-500">
+                      <span *ngIf="game.status !== 'waiting'">Juego no disponible</span>
+                      <span *ngIf="game.status === 'waiting' && (game.players?.length || 0) >= 2">Juego completo</span>
+                    </span>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- No Games State -->
+          <ng-template #noGames>
+            <div class="text-center py-12 bg-white rounded-lg shadow">
+              <div class="text-gray-400 text-6xl mb-4">🎮</div>
+              <h3 class="text-lg font-medium text-gray-900 mb-2">No hay juegos disponibles</h3>
+              <p class="text-gray-600 mb-6">¡Sé el primero en crear un juego!</p>
+              <button
+                (click)="createGame()"
+                [disabled]="isCreatingGame"
+                class="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-3 rounded-md font-medium flex items-center mx-auto"
+              >
+                <span *ngIf="isCreatingGame" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+                {{ isCreatingGame ? 'Creando juego...' : 'Crear mi primer juego' }}
+              </button>
+            </div>
+          </ng-template>
+
         </div>
       </div>
     </main>
