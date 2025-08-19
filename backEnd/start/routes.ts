@@ -17,7 +17,7 @@ router.group(() => {
   router.post('/register', [AuthController, 'register'])
   router.get('/me', [AuthController, 'me'])
   router.post('/logout', [AuthController, 'logout'])
-}).prefix('/api/auth')
+}).prefix('/auth')
 
 router.get('/', async () => {
   return {

@@ -33,13 +33,13 @@ export class AuthService {
 
   login(data: LoginRequest): Observable<LoginResponse> {
     return this.#http.post<LoginResponse>(
-      `${environment.apiBaseUrl}/login`, data, { withCredentials: true }
+      `${environment.apiBaseUrl}/auth/login`, data, { withCredentials: true }
     );
   }
 
   register(data: RegisterRequest): Observable<RegisterResponse> {
     return this.#http.post<RegisterResponse>(
-      `${environment.apiBaseUrl}/register`, data, { withCredentials: true }
+      `${environment.apiBaseUrl}/auth/register`, data, { withCredentials: true }
     ).pipe(
       tap(() => {
         this.fetchMe().subscribe();
@@ -49,7 +49,7 @@ export class AuthService {
 
   logout(): Observable<any> {
     return this.#http
-      .post(`${environment.apiBaseUrl}/logout`, {}, { withCredentials: true })
+      .post(`${environment.apiBaseUrl}/auth/logout`, {}, { withCredentials: true })
       .pipe(
         tap(() => {
           this._user$.next(null);
