@@ -77,6 +77,16 @@ export class GameComponent implements OnInit, OnDestroy {
     });
   }
 
+  // Derived helpers for template
+  get screenNumbers(): number[] {
+    const total = this.players?.length || 0;
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+
+  isScreenTaken(screen: number): boolean {
+    return this.players?.some((p) => Number(p.boatChoice) === screen) || false;
+  }
+
   canStartGame(): boolean {
     if (!this.game || this.status !== 'ready') return false;
     return this.userId === this.game.creatorId;
@@ -100,6 +110,18 @@ export class GameComponent implements OnInit, OnDestroy {
 
   goLobby(): void {
     this.#router.navigate(['/lobby']);
+  }
+
+  leaveGame(): void {
+    if (!this.gameId || !this.userId) {
+      this.goLobby();
+      return;
+    }
+    this.#socket.leaveGame({
+      gameId: this.gameId,
+      userId: this.userId,
+    });
+    this.goLobby();
   }
 
   private initializeFromServer(game: Game, player: GamePlayer): void {
@@ -128,6 +150,10 @@ export class GameComponent implements OnInit, OnDestroy {
         this.game = g;
         this.players = g.players || [];
         this.status = g.status;
+        // Sync selected screen from my player state
+        const me = this.players.find(p => p.userId === this.userId);
+        const screenNum = me && me.boatChoice != null ? Number(me.boatChoice) : null;
+        this.selectedScreen = Number.isFinite(screenNum as number) ? (screenNum as number) : null;
       }
     });
 
@@ -137,6 +163,14 @@ export class GameComponent implements OnInit, OnDestroy {
 
     this.#socket.gameStatus$.subscribe((s) => {
       this.status = s;
+    });
+
+    // Keep players mirrored from stream to ensure dynamic screen count updates
+    this.#socket.gamePlayers$.subscribe((pl) => {
+      this.players = pl || [];
+      const me = this.players.find(p => p.userId === this.userId);
+      const screenNum = me && me.boatChoice != null ? Number(me.boatChoice) : null;
+      this.selectedScreen = Number.isFinite(screenNum as number) ? (screenNum as number) : this.selectedScreen;
     });
   }
 }

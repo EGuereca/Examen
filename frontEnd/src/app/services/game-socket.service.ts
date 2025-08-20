@@ -25,6 +25,11 @@ export interface ClickBoatPayload {
   userId: number;
 }
 
+export interface LeaveGamePayload {
+  gameId: number;
+  userId: number;
+}
+
 // Socket event responses
 export interface PlayerJoinedEvent {
   userId: number;
@@ -150,6 +155,19 @@ export class GameSocketService {
   }
 
   /**
+   * Leave the game room
+   */
+  leaveGame(payload: LeaveGamePayload): void {
+    if (!this.socket?.connected) {
+      console.error('Socket not connected');
+      return;
+    }
+
+    this.socket.emit('leaveGame', payload);
+    this.resetGameState();
+  }
+
+  /**
    * Setup all socket event listeners
    */
   private setupSocketListeners(): void {
@@ -174,6 +192,17 @@ export class GameSocketService {
     });
 
     // Game events
+    this.socket.on('syncGame', (data: { game: Game }) => {
+      this.zone.run(() => {
+        // Inicializa estado completo para el cliente que se acaba de unir
+        const game = data.game
+        this.currentGameSubject.next(game)
+        this.gameStatusSubject.next(game.status)
+        if (game.players) {
+          this.gamePlayersSubject.next(game.players)
+        }
+      });
+    });
     this.socket.on('playerJoined', (data: PlayerJoinedEvent) => {
       this.zone.run(() => {
         console.log('👤 Player joined:', data.userId);

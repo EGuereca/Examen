@@ -21,7 +21,7 @@ export default class GameHttpController {
     const user = await auth.use('api').authenticate()
     const gameId = Number(params.id)
 
-    const game = await Game.find(gameId)
+    const game = await Game.query().where('id', gameId).preload('players').first()
     if (!game) return response.notFound({ message: 'Juego no encontrado' })
 
     const player = await GamePlayer.updateOrCreate(

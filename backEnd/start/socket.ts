@@ -9,7 +9,9 @@ import {
   clickBoat as clickBoatAction,
   markDisconnected,
   markGameWaitingIfNotAllReady,
+  endGameAssignCreatorWinner,
 } from '../app/controllers/game.controller.js'
+import Game from '../app/models/game.js'
 
 // Puerto para WebSocket
 const PORT = 3334
@@ -60,8 +62,30 @@ io.on('connection', (socket) => {
     }
 
     socket.join(`game:${gameId}`)
+    // Enviar estado completo del juego al socket que se une
+    const fullGame = await Game.query().where('id', gameId).preload('players').first()
+    if (fullGame) {
+      socket.emit('syncGame', { game: fullGame })
+    }
     io.to(`game:${gameId}`).emit('playerJoined', { userId })
     console.log(`✅ Socket ${socket.id} se unió a game:${gameId}`)
+  })
+
+  // Salir de la partida (cierra juego si estaba en progreso y asigna ganador al creador)
+  socket.on('leaveGame', async (payload: { gameId: number; userId: number }) => {
+    const { gameId } = payload || ({} as any)
+    if (!gameId) return
+
+    const res = await endGameAssignCreatorWinner(gameId)
+    if (res.changed) {
+      const loop = gameLoops.get(gameId)
+      if (loop) {
+        clearInterval(loop)
+        gameLoops.delete(gameId)
+      }
+      io.to(`game:${gameId}`).emit('winner', { winner: res.winnerId })
+    }
+    socket.leave(`game:${gameId}`)
   })
 
   // Seleccionar barco
@@ -71,7 +95,10 @@ io.on('connection', (socket) => {
     if (!gameId || !userId) return
 
     const res = await chooseBoatAction(gameId, userId, boatChoice)
-    if ('error' in res) return
+    if ('error' in res) {
+      socket.emit('error', { msg: res.error })
+      return
+    }
 
     io.to(`game:${gameId}`).emit('playerReady', { userId, boatChoice })
 

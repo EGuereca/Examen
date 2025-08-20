@@ -10,13 +10,19 @@
 
   <main class="max-w-5xl mx-auto py-6 sm:px-6 lg:px-8">
     <div class="bg-white rounded-lg shadow p-6">
+      <div class="flex justify-end mb-4">
+        <button class="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300" (click)="leaveGame()">Salir de la partida</button>
+      </div>
 
       <div *ngIf="(status$ | async) === 'waiting'" class="space-y-6">
         <h2 class="text-lg font-medium">Elegir pantalla</h2>
-        <div class="flex items-center gap-4">
-          <button (click)="chooseScreen(1)" [class]="'px-4 py-2 rounded text-white ' + (selectedScreen===1 ? 'bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700')">Pantalla 1</button>
-          <button (click)="chooseScreen(2)" [class]="'px-4 py-2 rounded text-white ' + (selectedScreen===2 ? 'bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700')">Pantalla 2</button>
-          <button (click)="chooseScreen(3)" [class]="'px-4 py-2 rounded text-white ' + (selectedScreen===3 ? 'bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700')">Pantalla 3</button>
+        <div class="flex items-center gap-2 flex-wrap">
+          <button *ngFor="let s of screenNumbers"
+                  (click)="chooseScreen(s)"
+                  [disabled]="isScreenTaken(s) && selectedScreen !== s"
+                  [class]="'px-3 py-2 rounded text-white disabled:opacity-50 disabled:cursor-not-allowed ' + (selectedScreen===s ? 'bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700')">
+            Pantalla {{ s }}
+          </button>
         </div>
 
         <div>

@@ -26,7 +26,21 @@ export async function chooseBoat(gameId: number, userId: number, boatChoice: str
 
   if (!player) return { error: 'Jugador no encontrado en el juego' as const }
 
-  player.boatChoice = boatChoice
+  // Validar pantalla elegida
+  const allPlayers = await GamePlayer.query().where('game_id', gameId)
+  const screenNumber = Number(boatChoice)
+  if (!Number.isFinite(screenNumber) || screenNumber < 1) {
+    return { error: 'Pantalla inválida' as const }
+  }
+  if (screenNumber > allPlayers.length) {
+    return { error: 'Pantalla fuera de rango' as const }
+  }
+  const taken = allPlayers.some((p) => p.userId !== userId && String(p.boatChoice) === String(screenNumber))
+  if (taken) {
+    return { error: 'Pantalla ya seleccionada por otro jugador' as const }
+  }
+
+  player.boatChoice = String(screenNumber)
   player.ready = true
   await player.save()
 
@@ -154,6 +168,17 @@ export async function markGameWaitingIfNotAllReady(gameId: number) {
   game.status = 'waiting'
   await game.save()
   return { changed: true }
+}
+
+export async function endGameAssignCreatorWinner(gameId: number) {
+  const game = await Game.find(gameId)
+  if (!game) return { changed: false }
+  if (game.status !== 'in_progress') return { changed: false }
+
+  game.status = 'finished'
+  game.winnerId = game.creatorId
+  await game.save()
+  return { changed: true, winnerId: game.creatorId }
 }
 
 
