@@ -12,11 +12,11 @@
     <div class="bg-white rounded-lg shadow p-6">
 
       <div *ngIf="(status$ | async) === 'waiting'" class="space-y-6">
-        <h2 class="text-lg font-medium">Elegir barco</h2>
+        <h2 class="text-lg font-medium">Elegir pantalla</h2>
         <div class="flex items-center gap-4">
-          <button (click)="chooseBoat('red')" [class]="'px-4 py-2 rounded text-white ' + (selectedBoat==='red' ? 'bg-red-700' : 'bg-red-600 hover:bg-red-700')">Rojo</button>
-          <button (click)="chooseBoat('blue')" [class]="'px-4 py-2 rounded text-white ' + (selectedBoat==='blue' ? 'bg-blue-700' : 'bg-blue-600 hover:bg-blue-700')">Azul</button>
-          <button (click)="chooseBoat('green')" [class]="'px-4 py-2 rounded text-white ' + (selectedBoat==='green' ? 'bg-green-700' : 'bg-green-600 hover:bg-green-700')">Verde</button>
+          <button (click)="chooseScreen(1)" [class]="'px-4 py-2 rounded text-white ' + (selectedScreen===1 ? 'bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700')">Pantalla 1</button>
+          <button (click)="chooseScreen(2)" [class]="'px-4 py-2 rounded text-white ' + (selectedScreen===2 ? 'bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700')">Pantalla 2</button>
+          <button (click)="chooseScreen(3)" [class]="'px-4 py-2 rounded text-white ' + (selectedScreen===3 ? 'bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700')">Pantalla 3</button>
         </div>
 
         <div>
@@ -27,29 +27,29 @@
               <span [class]="'px-2 py-0.5 rounded ' + (p.ready ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')">
                 {{ p.ready ? 'Listo' : 'Esperando' }}
               </span>
-              <span class="text-xs text-gray-500" *ngIf="p.boatChoice">({{ p.boatChoice }})</span>
+              <span class="text-xs text-gray-500" *ngIf="p.boatChoice">(Pantalla {{ p.boatChoice }})</span>
             </div>
           </div>
         </div>
       </div>
 
       <div *ngIf="(status$ | async) === 'ready'" class="space-y-4">
-        <p class="text-gray-700">Todos han elegido su barco. Esperando a que el creador inicie…</p>
+        <p class="text-gray-700">Todos han elegido su pantalla. Esperando a que el creador inicie…</p>
         <button *ngIf="canStartGame()" (click)="startGame()" class="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700">Iniciar juego</button>
       </div>
 
       <div *ngIf="(status$ | async) === 'in_progress'" class="space-y-6">
-        <div class="relative h-24 bg-sky-50 rounded overflow-hidden border">
-          <div class="absolute top-1 left-1 text-xs text-gray-600">Dueño: {{ (boat$ | async)?.ownerId }}</div>
-          <!-- Simple visual: boat horizontal position mapped to width (%) -->
-          <div class="absolute top-8 h-8 w-12 flex items-center justify-center rounded text-white"
-               [style.left.%]="(boat$ | async)?.position || 0"
-               [class]="(((boat$ | async)?.ownerId === userId) ? 'bg-emerald-600' : 'bg-slate-600') + ' cursor-pointer'"
-               (click)="clickBoat()">
-            ⛵
+        <ng-container *ngIf="(boat$ | async)?.ownerId === userId">
+          <div class="relative h-24 bg-sky-50 rounded overflow-hidden border">
+            <div class="absolute top-1 left-1 text-xs text-gray-600">Tu pantalla activa</div>
+            <div class="absolute top-8 h-8 w-12 flex items-center justify-center rounded text-white bg-emerald-600 cursor-pointer"
+                 [style.left.%]="(boat$ | async)?.position || 0"
+                 (click)="clickBoat()">
+              ⛵
+            </div>
           </div>
-        </div>
-        <p class="text-sm text-gray-600">Haz clic en el barco cuando esté en tu pantalla si eres el dueño para ganar.</p>
+          <p class="text-sm text-gray-600">Haz clic en el barco en tu pantalla para ganar.</p>
+        </ng-container>
       </div>
 
       <div *ngIf="(status$ | async) === 'finished'" class="space-y-4">

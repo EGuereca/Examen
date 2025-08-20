@@ -26,7 +26,7 @@ export class GameComponent implements OnInit, OnDestroy {
   status: GameStatus = 'waiting';
   players: GamePlayer[] = [];
 
-  selectedBoat: string | null = null;
+  selectedScreen: number | null = null;
 
   // Reactive streams for template (async pipe)
   game$!: Observable<Game | null>;
@@ -67,13 +67,13 @@ export class GameComponent implements OnInit, OnDestroy {
     this.#socket.disconnect();
   }
 
-  chooseBoat(choice: string): void {
+  chooseScreen(choice: number): void {
     if (!this.gameId || !this.userId) return;
-    this.selectedBoat = choice;
+    this.selectedScreen = choice;
     this.#socket.chooseBoat({
       gameId: this.gameId,
       userId: this.userId,
-      boatChoice: choice,
+      boatChoice: String(choice),
     });
   }
 

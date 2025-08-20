@@ -60,13 +60,26 @@ export async function startGame(gameId: number, userId: number) {
   if (players.length < 2) return { error: 'Se requieren al menos 2 jugadores' as const }
 
   let boat = await Boat.query().where('game_id', gameId).first()
+  // Determinar el usuario inicial según la pantalla elegida (boatChoice numérico más bajo)
+  const playersWithScreen = players
+    .map((p) => ({ player: p, screen: Number(p.boatChoice) }))
+    .filter((x) => Number.isFinite(x.screen))
+    .sort((a, b) => a.screen - b.screen)
+
+  const startOwnerId = (playersWithScreen[0]?.player?.userId) ?? players[0].userId
+
   if (!boat) {
     boat = await Boat.create({
       gameId,
       position: 0,
-      ownerId: players[0].userId,
+      ownerId: startOwnerId,
       direction: 'forward',
     })
+  } else {
+    boat.position = 0
+    boat.ownerId = startOwnerId
+    boat.direction = 'forward'
+    await boat.save()
   }
 
   return { boat }
@@ -84,10 +97,21 @@ export async function boatTick(gameId: number) {
   if (boat.position >= 100) {
     const players = await GamePlayer.query().where('game_id', gameId).orderBy('id', 'asc')
     if (players.length === 0) return { stop: true as const }
-    const currentIndex = players.findIndex((p) => p.userId === boat.ownerId)
-    const nextIndex = (currentIndex + 1) % players.length
+
+    // Ordenar por número de pantalla (boatChoice numérico asc), luego resto por id
+    const withScreen = players
+      .map((p) => ({ player: p, screen: Number(p.boatChoice) }))
+    const orderedByScreen = withScreen
+      .filter((x) => Number.isFinite(x.screen))
+      .sort((a, b) => a.screen - b.screen)
+      .map((x) => x.player)
+    const withoutScreen = players.filter((p) => !Number.isFinite(Number(p.boatChoice)))
+    const orderedPlayers = [...orderedByScreen, ...withoutScreen]
+
+    const currentIndex = orderedPlayers.findIndex((p) => p.userId === boat.ownerId)
+    const nextIndex = (currentIndex + 1) % orderedPlayers.length
     boat.position = 0
-    boat.ownerId = players[nextIndex].userId
+    boat.ownerId = orderedPlayers[nextIndex].userId
   }
 
   await boat.save()
